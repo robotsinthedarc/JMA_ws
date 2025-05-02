@@ -15,7 +15,7 @@ from cflib.crazyflie.swarm import CachedCfFactory
 from cflib.crazyflie.swarm import Swarm
 from cflib.crazyflie.log import LogConfig
 
-from crazyflie_interfaces.msg import CrazyflieCommands, CrazyflieData, CrazyflieLanding
+from custom_msgs import cf_cmnds, cf_data, cf_landing
 
 class SwarmControlNode(Node):
     def __init__(self):
@@ -36,8 +36,10 @@ class SwarmControlNode(Node):
 
         # create subscribers to get roll, pitch, yaw, thrust commands
         # for each of the drones
-        self.fly10_command_subscriber = self.create_subscription(CrazyflieCommands,'/fly10/commands',self.get_commands,10)
-        self.fly11_command_subscriber = self.create_subscription(CrazyflieCommands,'/fly11/commands',self.get_commands,10)
+        if self.ids > 0:
+            self.cf01_command_subscriber = self.create_subscription(CrazyflieCommands,'/cf01/commands',self.get_commands,10)
+        if self.ids > 1:
+            self.cf02_command_subscriber = self.create_subscription(CrazyflieCommands,'/cf02/commands',self.get_commands,10)
         
         # subsription to the landing topic
         self.landing_sub = self.create_subscription(CrazyflieLanding,'land',self.landing_callback,10)
@@ -47,10 +49,10 @@ class SwarmControlNode(Node):
         # i.e. if there are 3 drones, the ending part of the radios will be
         # 10, 11, 12
         uris = []
-        id = 10
-        for i in range(self.ids):
-            new_uri = 'radio://0/80/2M/E7E7E7E7' + str(id)
-            id += 1
+      
+        for i in range(1, self.ids +1):
+            temp_id_name = f"{i:02d}"
+            new_uri = 'radio://0/80/2M/E7E7E7E7' + temp_id_name
             uris.append(new_uri)
         # set up a dictionary to store URIs
         self.uris = {
@@ -106,13 +108,13 @@ class SwarmControlNode(Node):
         # the number of publishers set up depends on the number of crazyflies
         # that are set up in the launch file
         if self.ids > 0:
-            self.fly10_publisher = self.create_publisher(
-                CrazyflieData, '/fly10/data',10)
-            self.create_timer(0.01,self.fly10_publish_callback)
+            self.cf01_publisher = self.create_publisher(
+                CrazyflieData, '/cf01/data',10)
+            self.create_timer(0.01,self.cf01_publish_callback)
         if self.ids > 1:
-            self.fly11_publisher = self.create_publisher(
-                CrazyflieData, '/fly11/data',10)
-            self.create_timer(0.01,self.fly11_publish_callback)
+            self.cf02_publisher = self.create_publisher(
+                CrazyflieData, '/cf02/data',10)
+            self.create_timer(0.01,self.cf02_publish_callback)
 
         # arm all drones in the swarm
         self.swarm.parallel_safe(self.arming_function)
@@ -219,11 +221,11 @@ class SwarmControlNode(Node):
                          msg.z_err, msg.z_err_dot, msg.z_err_int]}
         self.data_dict6.update(vec)
 
-    def fly10_publish_callback(self):
-        # publisher for cf10 data
+    def cf01_publish_callback(self):
+        # publisher for cf01 data
         # the data is sent to another node and printed to a .txt file from there
         # the node is set up in crazyflie_data_reader.py
-        uri = 'radio://0/80/2M/E7E7E7E710'
+        uri = 'radio://0/80/2M/E7E7E7E701'
         msg = CrazyflieData()
         msg.timestamp = self.data_dict1[uri][0]
         msg.acc_x = self.data_dict1[uri][1]
@@ -262,13 +264,13 @@ class SwarmControlNode(Node):
         msg.z_err_dot = self.data_dict6[uri][7]
         msg.z_err_int = self.data_dict6[uri][8]
 
-        self.fly10_publisher.publish(msg)
+        self.cf01_publisher.publish(msg)
 
-    def fly11_publish_callback(self):
-        # publisher for cf11 data
+    def cf02_publish_callback(self):
+        # publisher for cf02 data
         # the data is sent to another node and printed to a .txt file from there
         # the node is set up in crazyflie_data_reader.py
-        uri = 'radio://0/80/2M/E7E7E7E711'
+        uri = 'radio://0/80/2M/E7E7E7E702'
         msg = CrazyflieData()
         msg.timestamp = self.data_dict1[uri][0]
         msg.acc_x = self.data_dict1[uri][1]
@@ -307,7 +309,7 @@ class SwarmControlNode(Node):
         msg.z_err_dot = self.data_dict6[uri][7]
         msg.z_err_int = self.data_dict6[uri][8]
 
-        self.fly11_publisher.publish(msg)
+        self.cf02_publisher.publish(msg)
 
     # new publishers should be added here as new crazyfiles are added to the swarm
     # there may be a better way to do this than setting up individual publishers

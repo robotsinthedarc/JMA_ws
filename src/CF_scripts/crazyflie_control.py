@@ -13,24 +13,25 @@ import rclpy
 from rclpy.node import Node
 
 from geometry_msgs.msg import PoseStamped
-from crazyflie_interfaces.msg import CrazyflieCommands, CrazyflieDesired
+from custom_msgs import cf_cmnds, cf_desPos
 
 class FlyControlNode(Node):
     def __init__(self):
         super().__init__("crazyflie_control")
 
-        # declare drone ID as a parameter, set default to 10
-        self.declare_parameter("id",10)
+        # declare drone ID as a parameter, set default to 1
+        self.declare_parameter("id",1)
         # get the parameter from the launch script, or use the default
         self.id = self.get_parameter("id").value
+        self.formatted_id = f"{self.id:02d}"
 
-        self.get_logger().info("Fly " + str(self.id) + " Control Launched")
+        self.get_logger().info("cf " + str(self.formatted_id) + " Control Launched")
 
         # set the URI for the drone, and name all of the subscriber and publisher topics
-        self.uri = 'radio://0/80/2M/E7E7E7E7' + str(self.id)
-        sub_topic1 = '/fly' + str(self.id) + '/pose'
-        sub_topic2 = '/fly' + str(self.id) + '/desired'
-        pub_topic = '/fly' + str(self.id) + '/commands'
+        self.uri = 'radio://0/80/2M/E7E7E7E7' + self.formatted_id
+        sub_topic1 = '/cf' + self.formatted_id + '/pose'
+        sub_topic2 = '/cf' + self.formatted_id + '/desired'
+        pub_topic = '/cf' + self.formatted_id + '/commands'
 
         # create subscribers and publishers
         # this subscriber gets the pose from MoCap
@@ -72,7 +73,7 @@ class FlyControlNode(Node):
         # gains tested 06/24/24. Need continued testing
         # gains for the z dierection appear fine for both drones
         # tuning needs continued in x and y directions
-        if self.id == 10:
+        if self.id == 1:
             self.kp_z = 115.0
             self.kd_z = 40.0
             self.ki_z = 25.0
@@ -80,7 +81,7 @@ class FlyControlNode(Node):
             self.kd_xy = 50.0
             self.ki_xy = 7.0
 
-        if self.id == 11:
+        if self.id == 2:
             self.kp_z = 120.0
             self.kd_z = 38.0
             self.ki_z = 22.0

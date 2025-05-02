@@ -12,23 +12,24 @@ import rclpy
 from rclpy.node import Node
 
 from geometry_msgs.msg import PoseStamped
-from crazyflie_interfaces.msg import CrazyflieDesired, CrazyflieLanding
+from custom_msgs import cf_desPos, cf_landing
 
 class PositionControlNode(Node):
     def __init__(self):
         super().__init__("crazyflie_positioning")
 
         # declare ID as a parameter, set default to 10
-        self.declare_parameter("id",10)
+        self.declare_parameter("id",1)
         # get the parameter value from the launch script, or use the default
         self.id = self.get_parameter("id").value
+        self.formatted_id = f"{self.id:02d}"
 
-        self.get_logger().info("Fly " + str(self.id) + " Positioning Launched")
+        self.get_logger().info("cf " + self.formatted_id + " Positioning Launched")
 
         # set the URI for the drone, as well as subscriber and publisher topics
-        self.uri = 'radio://0/80/2M/E7E7E7E7' + str(self.id)
-        sub_topic = '/fly' + str(self.id) + '/pose'
-        pub_topic = '/fly' + str(self.id) + '/desired'
+        self.uri = 'radio://0/80/2M/E7E7E7E7' + self.formatted_id
+        sub_topic = '/cf' + self.formatted_id + '/pose'
+        pub_topic = '/cf' + self.formatted_id + '/desired'
 
         # set initial landing and take of flags and values
         self.first_position = True
@@ -75,49 +76,49 @@ class PositionControlNode(Node):
         # uncomment sections below for different behaviors
         self.t = time.time() - self.init_time
         
-        # circle
-        msg.x_des = self.x0 + 0.5 * math.cos(self.omega * self.t)
-        msg.y_des = self.y0 + 0.5 * math.sin(self.omega * self.t)
-        msg.z_des = 0.5
+        # # circle
+        # msg.x_des = self.x0 + 0.5 * math.cos(self.omega * self.t)
+        # msg.y_des = self.y0 + 0.5 * math.sin(self.omega * self.t)
+        # msg.z_des = 0.5
 
-        #step
-        if self.t < 5.0:
-            msg.x_des = self.x0
-            msg.y_des = self.y0
-            msg.z_des = 0.5
-        elif self.t >= 5.0 and self.t < 10.0:
-            msg.x_des = self.x0 + 0.1
-            msg.y_des = self.y0
-            msg.z_des = 0.5
-        elif self.t >= 10.0 and self.t < 15.0:
-            msg.x_des = self.x0 - 0.1
-            msg.y_des = self.y0
-            msg.z_des = 0.5
-        elif self.t >= 15.0 and self.t < 20.0:
-            msg.x_des = self.x0
-            msg.y_des = self.y0
-            msg.z_des = 0.5
-        elif self.t >= 20.0 and self.t < 25.0:
-            msg.x_des = self.x0
-            msg.y_des = self.y0 + 0.1
-            msg.z_des = 0.5
-        elif self.t >= 25.0 and self.t < 30.0:
-            msg.x_des = self.x0
-            msg.y_des = self.y0 - 0.1
-            msg.z_des = 0.5
-        elif self.t >= 35.0 and self.t < 40.0:
-            msg.x_des = self.x0
-            msg.y_des = self.y0
-            msg.z_des = 0.5    
-        else:
-            msg.x_des = self.x0
-            msg.y_des = self.y0
-            msg.z_des = 0.5
+        # #step
+        # if self.t < 5.0:
+        #     msg.x_des = self.x0
+        #     msg.y_des = self.y0
+        #     msg.z_des = 0.5
+        # elif self.t >= 5.0 and self.t < 10.0:
+        #     msg.x_des = self.x0 + 0.1
+        #     msg.y_des = self.y0
+        #     msg.z_des = 0.5
+        # elif self.t >= 10.0 and self.t < 15.0:
+        #     msg.x_des = self.x0 - 0.1
+        #     msg.y_des = self.y0
+        #     msg.z_des = 0.5
+        # elif self.t >= 15.0 and self.t < 20.0:
+        #     msg.x_des = self.x0
+        #     msg.y_des = self.y0
+        #     msg.z_des = 0.5
+        # elif self.t >= 20.0 and self.t < 25.0:
+        #     msg.x_des = self.x0
+        #     msg.y_des = self.y0 + 0.1
+        #     msg.z_des = 0.5
+        # elif self.t >= 25.0 and self.t < 30.0:
+        #     msg.x_des = self.x0
+        #     msg.y_des = self.y0 - 0.1
+        #     msg.z_des = 0.5
+        # elif self.t >= 35.0 and self.t < 40.0:
+        #     msg.x_des = self.x0
+        #     msg.y_des = self.y0
+        #     msg.z_des = 0.5    
+        # else:
+        #     msg.x_des = self.x0
+        #     msg.y_des = self.y0
+        #     msg.z_des = 0.5
         
         # Hover
-        # msg.x_des = self.x0
-        # msg.y_des = self.y0
-        # msg.z_des = 0.5
+        msg.x_des = self.x0
+        msg.y_des = self.y0
+        msg.z_des = 0.5
 
         # set up take off procedure
         # the drone will slowly rise to a desired height

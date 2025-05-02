@@ -19,7 +19,7 @@ def generate_launch_description():
     num_drones = LaunchConfiguration('num_drones')
 
     global_param_node = Node(
-        package="crazyflie_test_pkg",
+        package="CF_scripts",
         executable="crazyflie_global_parameters"
     )
     ld.add_action(global_param_node)
@@ -33,19 +33,19 @@ def generate_launch_description():
         formatted_drone_id = f"{drone_id:02d}"
 
         control_node = Node(
-            package="crazyflie_test_pkg",
+            package="CF_scripts",
             executable="crazyflie_control",
             name=f"cf{formatted_drone_id}_control",  # Dynamic naming with formatted ID
             parameters=[{"id": drone_id}]  # Unique parameter for each drone
         )
         data_node = Node(
-            package="crazyflie_test_pkg",
+            package="CF_scripts",
             executable="crazyflie_data_reader",
             name=f"cf{formatted_drone_id}_data_reader",
             parameters=[{"id": drone_id}]
         )
         positioning_node = Node(
-            package="crazyflie_test_pkg",
+            package="CF_scripts",
             executable="crazyflie_positioning",
             name=f"cf{formatted_drone_id}_positioning",
             parameters=[{"id": drone_id}]
@@ -57,7 +57,7 @@ def generate_launch_description():
         ld.add_action(positioning_node)
 
     swarm_node = Node(
-        package="crazyflie_test_pkg",
+        package="CF_scripts",
         executable="swarm_control",
         parameters=[
             {"ids":num_drones.perform(ld)}

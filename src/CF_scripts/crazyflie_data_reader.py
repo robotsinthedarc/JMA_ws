@@ -11,7 +11,7 @@ import matplotlib as plt
 import rclpy
 from rclpy.node import Node
 
-from crazyflie_interfaces.msg import CrazyflieData, CrazyflieLanding
+from custom_msgs import cf_data, cr_landing
 
 class DataPrintNode(Node):
     def __init__(self):
@@ -21,13 +21,14 @@ class DataPrintNode(Node):
         self.printed = False
         self.first_message = True
 
-        self.declare_parameter("id",10)
+        self.declare_parameter("id",1)
 
         self.id = self.get_parameter("id").value
+        self.formatted_id = f"{self.id:02d}"
 
-        self.get_logger().info("Fly " + str(self.id) + " Data Reader launched")
+        self.get_logger().info("cf " + self.formatted_id + " Data Reader launched")
 
-        sub_topic = '/fly' + str(self.id) + '/data'
+        sub_topic = '/cf' + self.formatted_id + '/data'
 
         self.data_sub = self.create_subscription(CrazyflieData,sub_topic,self.data_callback,10)
         self.landing_sub = self.create_subscription(CrazyflieLanding,'land',self.landing_callback,10)
@@ -113,7 +114,7 @@ class DataPrintNode(Node):
 
         if self.landing and not self.printed:
             self.print_variables()
-            self.get_logger().info('Fly ' + str(self.id) + ' variables printed')
+            self.get_logger().info('cf ' + self.formatted_id + ' variables printed')
             self.printed = True
 
     def print_variables(self):
@@ -125,7 +126,7 @@ class DataPrintNode(Node):
                                      self.x_err, self.x_err_dot, self.x_err_int,
                                      self.y_err, self.y_err_dot, self.y_err_int,
                                      self.z_err, self.z_err_dot, self.z_err_int])
-        file_name = 'cf_' + str(self.id) + '_data_' + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M')
+        file_name = 'test_data/cf_' + self.formatted_id + '_data_' + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M')
         np.savetxt(file_name,save_data,fmt='%1.5f')
 
     def landing_callback(self, msg):
