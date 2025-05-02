@@ -1,8 +1,22 @@
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 def generate_launch_description():
     ld = LaunchDescription()
+
+    # adjust the number of drones to match the swarm
+    # drones should be added in order of URI
+    # ie for 1 drone, uri 10 should be used
+    # for 2 drones, uris 10 and 11 should be used
+    # for 3 drones, 10, 11, and 12 etc.
+
+    # Declare an argument for num_drones with a default value of 1
+    ld.add_action(DeclareLaunchArgument('num_drones', default_value='1', description='Number of drones'))
+
+    # Use LaunchConfiguration to get the num_drones value
+    num_drones = LaunchConfiguration('num_drones')
 
     global_param_node = Node(
         package="crazyflie_test_pkg",
@@ -10,80 +24,43 @@ def generate_launch_description():
     )
     ld.add_action(global_param_node)
 
-    # adjust the number of drones to match the swarm
-    # drones should be added in order of URI
-    # ie for 1 drone, uri 10 should be used
-    # for 2 drones, uris 10 and 11 should be used
-    # for 3 drones, 10, 11, and 12 etc.
-    num_drones = 1
-    ids = 0
+    # Create nodes for the drones based on the number of drones specified
+    for i in range(1, int(num_drones.perform(ld)) + 1):
 
-    if num_drones >= 1:
-        ids += 1
-        fly10_control_node = Node(
+        drone_id = i  
+
+        # Ensure id is formatted to two digits, i.e., "01" to "09"
+        formatted_drone_id = f"{drone_id:02d}"
+
+        control_node = Node(
             package="crazyflie_test_pkg",
             executable="crazyflie_control",
-            name="fly10_control", # this renames the node, preventing issues
-            parameters=[
-                {"id":10}
-            ]
+            name=f"cf{formatted_drone_id}_control",  # Dynamic naming with formatted ID
+            parameters=[{"id": drone_id}]  # Unique parameter for each drone
         )
-        fly10_data_node = Node(
+        data_node = Node(
             package="crazyflie_test_pkg",
             executable="crazyflie_data_reader",
-            name="fly10_data_reader",
-            parameters=[
-                {"id":10}
-            ]
+            name=f"cf{formatted_drone_id}_data_reader",
+            parameters=[{"id": drone_id}]
         )
-        fly10_desired_node = Node(
+        positioning_node = Node(
             package="crazyflie_test_pkg",
             executable="crazyflie_positioning",
-            name="fly10_positioning",
-            parameters=[
-                {"id":10}
-            ]
+            name=f"cf{formatted_drone_id}_positioning",
+            parameters=[{"id": drone_id}]
         )
-        ld.add_action(fly10_control_node)
-        ld.add_action(fly10_data_node)
-        ld.add_action(fly10_desired_node)
 
-
-    if num_drones >= 2:
-        ids += 1
-        fly11_control_node = Node(
-            package="crazyflie_test_pkg",
-            executable="crazyflie_control",
-            name="fly11_control",
-            parameters=[
-                {"id":11}
-            ]
-        )
-        fly11_data_node = Node(
-            package="crazyflie_test_pkg",
-            executable="crazyflie_data_reader",
-            name="fly11_data_reader",
-            parameters=[
-                {"id":11}
-            ]
-        )
-        fly11_desired_node = Node(
-            package="crazyflie_test_pkg",
-            executable="crazyflie_positioning",
-            name="fly11_positioning",
-            parameters=[
-                {"id":11}
-            ]
-        )
-        ld.add_action(fly11_control_node)
-        ld.add_action(fly11_data_node)
-        ld.add_action(fly11_desired_node)
+        # Add the nodes to the launch description
+        ld.add_action(control_node)
+        ld.add_action(data_node)
+        ld.add_action(positioning_node)
 
     swarm_node = Node(
         package="crazyflie_test_pkg",
         executable="swarm_control",
         parameters=[
-            {"ids":ids}
+            {"ids":num_drones.perform(ld)}
         ]
     )
 
