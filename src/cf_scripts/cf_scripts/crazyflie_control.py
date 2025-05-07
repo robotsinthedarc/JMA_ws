@@ -48,13 +48,19 @@ class FlyControlNode(Node):
         self.z_desired = 0.0 # desired height in meters
         self.roll_des = 0.0 # initial desired roll in degrees
         self.pitch_des = 0.0 # initial desired pitch in degrees
+        self.yaw_des = 0.0 # initial desired yaw in degrees
+        self.yaw_rate_des = 0.0 # initial desired yaw rate in degrees/sec
 
         self.z_err = 0.0 # initial z error
         self.z_err_prev = 0.0 # initial previous z error
         self.z_err_dot = 0.0 # initial z error derivative
         self.z_err_int = 0.0 # initial integral of the z error
-        self.int_max = 2.0 # maximum integral error (to prevent windup)
-        self.int_min = -self.int_max
+        self.xy_int_max = 1.0 # maximum xy integral error (to prevent windup)
+        self.xy_int_min = -self.xy_int_max
+
+        self.z_int_max = 2.0 # maximum zintegral error (to prevent windup)
+        self.z_int_min = -self.z_int_max
+
         self.thrust = 0 # initial thrust value to be sent to the drone
 
         self.y_err = 0.0 # initial y error
@@ -67,34 +73,38 @@ class FlyControlNode(Node):
         self.x_err_dot = 0.0 # initial x error derivative
         self.x_err_int = 0.0 # initial integral of the x error
 
+        self.yaw_err = 0.0 # initial yaw error
+        self.yaw_err_prev = 0.0 # initial previous yaw error
+        self.yaw_err_dot = 0.0 # initial yaw error derivative
+
         # set controller gains
         # the gains can be set by ID, depending on the parameter set earlier
         
         # gains tested 06/24/24. Need continued testing
         # gains for the z dierection appear fine for both drones
         # tuning needs continued in x and y directions
-        if self.id == 1:
-            self.kp_z = 115.0
-            self.kd_z = 40.0
-            self.ki_z = 25.0
-            self.kp_xy = 36.0
-            self.kd_xy = 50.0
-            self.ki_xy = 7.0
 
-            # self.kp_z = 2400.0
-            # self.kd_z = 0.0
-            # self.ki_z = 0.0
-            # self.kp_xy = 4800.0
-            # self.kd_xy = 0.0
-            # self.ki_xy = 0.0
+        # self.kp_z = 115.0 # Jakon's gains
+        # self.kd_z = 40.0
+        # self.ki_z = 25.0
+        self.kp_z = 115.0 # Jacob's gains
+        self.kd_z = 42.0
+        self.ki_z = 25.0
 
-        if self.id == 2:
-            self.kp_z = 120.0
-            self.kd_z = 38.0
-            self.ki_z = 22.0
-            self.kp_xy = 60.0
-            self.kd_xy = 65.0
-            self.ki_xy = 6.0
+        # tuned for x-step
+        # self.kp_xy = 60.0
+        # self.kd_xy = 50.0
+        # self.ki_xy = 0.0
+
+        # tuned on y-step (05-07-25)
+        self.kp_xy = 78.0
+        self.kd_xy = 61.0
+        self.ki_xy = 7.0
+
+        self.kp_yaw = 0.5
+        self.kd_yaw = 0.0
+
+        
             
         # set up timers to read elapsed time
         self.init_time = time.time()
@@ -126,6 +136,7 @@ class FlyControlNode(Node):
             self.yaw0 = self.yaw
             self.x_desired = self.x0
             self.y_desired = self.y0
+            self.yaw_desired = self.yaw0
 
     def euler_from_quaternion(self):
         """takes the quaternions from MoCap and converts them to Euler.
@@ -156,10 +167,10 @@ class FlyControlNode(Node):
         self.z_err_dot = (self.z_err - self.z_err_prev) / delta_t
         self.z_err_int += self.z_err * delta_t
         # if the integral error is too high, cap it
-        if self.z_err_int > self.int_max:
-            self.z_err_int = self.int_max
-        if self.z_err_int < self.int_min:
-            self.z_err_int = self.int_min
+        if self.z_err_int > self.z_int_max:
+            self.z_err_int = self.z_int_max
+        if self.z_err_int < self.z_int_min:
+            self.z_err_int = self.z_int_min
 
         # calculate y error with derivative and integral
         # the y error is negative because the crazyflie coordinate system
@@ -169,10 +180,10 @@ class FlyControlNode(Node):
         self.y_err_dot = (self.y_err - self.y_err_prev) / delta_t
         self.y_err_int += self.y_err * delta_t
         # if the integral error is too high, cap it
-        if self.y_err_int > self.int_max:
-            self.y_err_int = self.int_max
-        if self.y_err_int < self.int_min:
-            self.y_err_int = self.int_min
+        if self.y_err_int > self.xy_int_max:
+            self.y_err_int = self.xy_int_max
+        if self.y_err_int < self.xy_int_min:
+            self.y_err_int = self.xy_int_min
 
         # calculate x error with derivative and integral
         self.x_err_prev = self.x_err
@@ -180,10 +191,14 @@ class FlyControlNode(Node):
         self.x_err_dot = (self.x_err - self.x_err_prev) / delta_t
         self.x_err_int += self.x_err * delta_t
         # if the integral error is too high, cap it
-        if self.x_err_int > self.int_max:
-            self.x_err_int = self.int_max
-        if self.x_err_int < self.int_min:
-            self.x_err_int = self.int_min
+        if self.x_err_int > self.xy_int_max:
+            self.x_err_int = self.xy_int_max
+        if self.x_err_int < self.xy_int_min:
+            self.x_err_int = self.xy_int_min
+
+        self.yaw_err_prev = self.yaw_err
+        self.yaw_err = ((self.yaw - self.yaw_desired) + 180.0) % 360.0 - 180.0 # normalized between -180 and 180 (needed to flip the error calculation, due to rotations??)
+        self.yaw_err_dot = (self.yaw_err - self.yaw_err_prev) / delta_t
 
         # calculate thrust
         # map force value to thrust value
@@ -198,6 +213,7 @@ class FlyControlNode(Node):
         # calculate desired roll and pitch in world coordinates
         roll_des = self.kp_xy * self.y_err + self.kd_xy * self.y_err_dot + self.ki_xy * self.y_err_int
         pitch_des = self.kp_xy * self.x_err + self.kd_xy * self.x_err_dot + self.ki_xy * self.x_err_int
+        self.yaw_rate_des = self.kp_yaw * self.yaw_err + self.kd_yaw * self.yaw_err_dot
 
         # transform desired roll and pitch to body coordinates
         # self.roll_des = roll_des * math.cos(-self.yaw * math.pi / 180.0) - pitch_des * math.sin(-self.yaw * math.pi / 180.0)
@@ -225,6 +241,7 @@ class FlyControlNode(Node):
             msg.x_desired = self.x_desired
             msg.y_desired = self.y_desired
             msg.z_desired = self.z_desired
+            msg.yaw_desired = self.yaw_desired
             msg.roll_mocap = self.roll
             msg.pitch_mocap = self.pitch
             msg.yaw_mocap = self.yaw
@@ -237,7 +254,7 @@ class FlyControlNode(Node):
         msg.uri = self.uri
         msg.desired_roll = self.roll_des
         msg.desired_pitch = self.pitch_des
-        msg.desired_yaw_rate = 0.0 # once the yaw controller is implemented, this will need to change
+        msg.desired_yaw_rate = self.yaw_rate_des # once the yaw controller is implemented, this will need to change
         msg.thrust = self.thrust
 
         self.motor_command_publisher.publish(msg)
@@ -248,6 +265,7 @@ class FlyControlNode(Node):
         self.x_desired = msg.x_des
         self.y_desired = msg.y_des
         self.z_desired = msg.z_des
+        self.yaw_desired = msg.yaw_des
 
 def main(args=None):
     """Main function. Will run automatically on starting the node."""

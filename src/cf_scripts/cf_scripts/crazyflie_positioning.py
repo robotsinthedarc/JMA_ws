@@ -13,6 +13,7 @@ from rclpy.node import Node
 
 from geometry_msgs.msg import PoseStamped
 from custom_msgs.msg import CrazyflieDesired, CrazyflieLanding
+from std_msgs.msg import Bool
 
 ###########################################
 # Node Class
@@ -27,7 +28,7 @@ class PositionControlNode(Node):
         self.id = self.get_parameter("id").value
         self.formatted_id = f"{self.id:02d}"
 
-        self.get_logger().info("cf " + self.formatted_id + " Positioning Launched")
+        self.get_logger().info("cf" + self.formatted_id + " Positioning Launched")
 
         # set the URI for the drone, as well as subscriber and publisher topics
         self.uri = 'radio://0/80/2M/E7E7E7E7' + self.formatted_id
@@ -39,6 +40,7 @@ class PositionControlNode(Node):
         self.first_landing_command = True
         self.take_off = True
         self.landing = False
+        self.start_test = False
         self.z_take_off = 0.0
 
         self.init_flag = True
@@ -50,12 +52,26 @@ class PositionControlNode(Node):
         self.desired_position_pub = self.create_publisher(CrazyflieDesired,pub_topic,10)
         # this subscribes to the landing topic to determine if landing is necessary
         self.landing_sub = self.create_subscription(CrazyflieLanding,'land',self.landing_callback,10)
+        self.start_test_sub = self.create_subscription(Bool,'start_test',self.start_test_callback,10)
         
-        # self.rate = self.create_rate(60) # 60 Hz
 
         # get the initialization time
         self.init_time = time.time()
         self.t = time.time() - self.init_time
+
+    def euler_from_quaternion(self):
+        """takes the quaternions from MoCap and converts them to Euler.
+        Way easier to visualize and verify"""
+        t0 = +2.0 * (self.qw * self.qx + self.qy * self.qx)
+        t1 = +1.0 - 2.0 * (self.qx * self.qx + self.qy * self.qy)
+
+        t2 = +2.0 * (self.qw * self.qy - self.qz * self.qx)
+        t2 = +1.0 if t2 > +1.0 else t2
+        t2 = -1.0 if t2 < -1.0 else t2
+
+        t3 = +2.0 * (self.qw * self.qz + self.qx * self.qy)
+        t4 = +1.0 - 2.0 * (self.qy * self.qy + self.qz * self.qz)
+        self.yaw = math.atan2(t3, t4) * 180.0 / math.pi
         
 
     def position_callback(self,msg):
@@ -64,6 +80,15 @@ class PositionControlNode(Node):
             self.y0 = msg.pose.position.y
             self.z0 = msg.pose.position.z
             self.z_take_off = self.z0
+
+            self.qx = msg.pose.orientation.x
+            self.qy = msg.pose.orientation.y
+            self.qz = msg.pose.orientation.z
+            self.qw = msg.pose.orientation.w
+            # convert quaternions to euler angles
+            self.euler_from_quaternion()
+            self.yaw0 = self.yaw
+
             self.first_position = False
             self.create_timer(0.01,self.desired_position_publisher) # 100 Hz
         elif self.first_landing_command and self.landing:
@@ -83,6 +108,7 @@ class PositionControlNode(Node):
             msg.x_des = self.x0
             msg.y_des = self.y0
             msg.z_des = self.z0
+            msg.yaw_des = self.yaw0
 
             if self.t > 5.0:
                 self.init_flag = False
@@ -95,15 +121,22 @@ class PositionControlNode(Node):
 
             if self.take_off and self.z_take_off < 0.4:
                 alpha = 0.6
-                self.z_take_off = self.sigmoid_traj(self.t, self.z0, 0.4, 1.0, alpha)
+                self.z_take_off = self.sigmoid_traj(self.t, self.z0, 1.001*0.4, 1.0, alpha)
                 msg.z_des = self.z_take_off
                 msg.x_des = self.x0
                 msg.y_des = self.y0
-                if self.z_take_off > 0.99*0.4:
+
+                if self.z_take_off < 0.25:
+                    msg.yaw_des = self.yaw0
+                else:
+                    msg.yaw_des = 90.0
+
+                if self.z_take_off > 0.4:
                     self.take_off = False
+                    self.get_logger().info("cf" + self.formatted_id + " hover position reached")
                     self.init_time = time.time()
                     self.t = time.time() - self.init_time
-            else:
+            elif self.start_test:
                 ###############################################
                 # Select Trajectory
                 ###############################################
@@ -150,14 +183,21 @@ class PositionControlNode(Node):
                 # Hover
                 msg.x_des = self.x0
                 msg.y_des = self.y0
-                msg.z_des = 0.4
+                # msg.z_des = 0.5
+                msg.z_des = self.z_take_off
+                msg.yaw_des = 90.0
+            else:
+                msg.z_des = self.z_take_off
+                msg.x_des = self.x0
+                msg.y_des = self.y0
+                msg.yaw_des = 90.0
 
         # set up landing producre
         # the drone will slowly descend to a 5 cm
         # another script will then kill the motors and land the drone
         if self.landing and not self.first_landing_command:
             # need to decide a better landing procedure
-            if self.z_land > 0.08:
+            if self.z_land > 0.075:
                 self.z_land -= 0.001
             msg.x_des = self.x_land
             msg.y_des = self.y_land
@@ -166,10 +206,12 @@ class PositionControlNode(Node):
             
 
         self.desired_position_pub.publish(msg)
-        # self.rate.sleep() # limit to at fastest 60 Hz
 
     def landing_callback(self, msg):
         self.landing = msg.land
+
+    def start_test_callback(self, msg):
+        self.start_test = msg.data
 
     def sigmoid_traj(self, t, start_height, max_height, max_slope, alpha):
         # alpha specifies the ratio of the max height to compare to for the midpoint calculation

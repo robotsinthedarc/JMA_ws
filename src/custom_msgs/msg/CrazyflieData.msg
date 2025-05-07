@@ -17,6 +17,7 @@ float64 yaw_imu
 float64 roll_mocap
 float64 pitch_mocap
 float64 yaw_mocap
+float64 yaw_desired
 float64 roll_desired
 float64 pitch_desired
 float64 yaw_rate_desired

@@ -54,6 +54,7 @@ class DataPrintNode(Node):
         self.yaw_mocap = []
         self.roll_desired = []
         self.pitch_desired = []
+        self.yaw_desired = []
         self.m1 = []
         self.m2 = []
         self.m3 = []
@@ -93,6 +94,7 @@ class DataPrintNode(Node):
             self.yaw_mocap.append(msg.yaw_mocap)
             self.roll_desired.append(msg.roll_desired)
             self.pitch_desired.append(msg.pitch_desired)
+            self.yaw_desired.append(msg.yaw_desired)
             self.m1.append(msg.m1)
             self.m2.append(msg.m2)
             self.m3.append(msg.m3)
@@ -125,7 +127,8 @@ class DataPrintNode(Node):
                                      self.m1, self.m2, self.m3, self.m4, self.voltage, self.current,
                                      self.x_err, self.x_err_dot, self.x_err_int,
                                      self.y_err, self.y_err_dot, self.y_err_int,
-                                     self.z_err, self.z_err_dot, self.z_err_int])
+                                     self.z_err, self.z_err_dot, self.z_err_int,
+                                     self.yaw_desired])
         file_name = 'src/test_data/cf_' + self.formatted_id + '_data_' + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M')
         np.savetxt(file_name,save_data,fmt='%1.5f')
 

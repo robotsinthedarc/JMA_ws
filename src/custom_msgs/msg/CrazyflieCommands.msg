@@ -9,6 +9,7 @@ float64 z
 float64 x_desired
 float64 y_desired
 float64 z_desired
+float64 yaw_desired
 float64 roll_mocap
 float64 pitch_mocap
 float64 yaw_mocap
@@ -21,3 +22,4 @@ float64 y_err_int
 float64 z_err
 float64 z_err_dot
 float64 z_err_int
+

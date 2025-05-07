@@ -72,11 +72,11 @@ class SwarmControlNode(Node):
         # dictionary for temporarily storing drone data to be sent over a indiidual topics
         # the order is:
         # [timestamp, acc.x, acc.y, acc.z, gyro.x, gyro.y, gyro.z, x, y, z, x_des, y_des, z_des, 
-        # roll, pitch, yaw, roll_des, pitch_des, m1, m2, m3, m4, voltage, current]
+        # roll, pitch, yaw, roll_des, pitch_des, yaw_des, m1, m2, m3, m4, voltage, current]
         data_vec1 = [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         data_vec2 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         data_vec3 = [0.0, 0.0, 0.0]
-        data_vec4 = [0.0, 0.0, 0.0, 0.0, 0.0]
+        data_vec4 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         data_vec5 = [0, 0, 0, 0, 0.0, 0.0]
         data_vec6 = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         for i in range(self.ids):
@@ -206,16 +206,16 @@ class SwarmControlNode(Node):
     def get_commands(self,msg):
         # Reads the motor commands from other crazyflie 
         # command publishers into the command dictionary keyed on URI
-        # vec = {msg.uri: [msg.desired_roll, msg.desired_pitch, msg.desired_yaw_rate, msg.thrust]}
-        vec = {msg.uri: [0.0, 0.0, 0.0, 0]}
-        if self.landing and msg.z_desired < 0.08:
+        vec = {msg.uri: [msg.desired_roll, msg.desired_pitch, msg.desired_yaw_rate, msg.thrust]}
+        # vec = {msg.uri: [0.0, 0.0, 0.0, 0]}
+        if self.landing and msg.z_desired < 0.075:
             vec = {msg.uri: [0.0, 0.0, 0.0, 0]}
         self.com_dict.update(vec)
         # also reads current (x,y,z) and desired (x,y,z) position
         # which are stored in the data dictionary keyed on URI
         vec = {msg.uri: [msg.x, msg.y, msg.z, msg.x_desired, msg.y_desired, msg.z_desired]}
         self.data_dict2.update(vec)
-        vec = {msg.uri: [msg.roll_mocap, msg.pitch_mocap, msg.yaw_mocap, msg.desired_roll, msg.desired_pitch]}
+        vec = {msg.uri: [msg.roll_mocap, msg.pitch_mocap, msg.yaw_mocap, msg.desired_roll, msg.desired_pitch, msg.yaw_desired]}
         self.data_dict4.update(vec)
         vec = {msg.uri: [msg.x_err, msg.x_err_dot, msg.x_err_int, 
                          msg.y_err, msg.y_err_dot, msg.y_err_int,
@@ -249,6 +249,7 @@ class SwarmControlNode(Node):
         msg.yaw_mocap = self.data_dict4[uri][2]
         msg.roll_desired = self.data_dict4[uri][3]
         msg.pitch_desired = self.data_dict4[uri][4]
+        msg.yaw_desired = self.data_dict4[uri][5]
         msg.m1 = self.data_dict5[uri][0]
         msg.m2 = self.data_dict5[uri][1]
         msg.m3 = self.data_dict5[uri][2]
@@ -294,6 +295,7 @@ class SwarmControlNode(Node):
         msg.yaw_mocap = self.data_dict4[uri][2]
         msg.roll_desired = self.data_dict4[uri][3]
         msg.pitch_desired = self.data_dict4[uri][4]
+        msg.yaw_desired = self.data_dict4[uri][5]
         msg.m1 = self.data_dict5[uri][0]
         msg.m2 = self.data_dict5[uri][1]
         msg.m3 = self.data_dict5[uri][2]

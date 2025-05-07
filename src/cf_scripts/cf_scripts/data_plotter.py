@@ -2,16 +2,41 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import os
 
 plt.close('all')
 
+##################################################
+# SETUP
+##################################################
+plot_newest = True
+
+# specify timestamp if not using plot_newest
 timestamp = '2025_05_06_16_46'
+
 num_drones = 1
-plot_error = True
+plot_error = False
 plot_angles = False
 
-file_name1 = '/home/parallels/JMA_ws/src/test_data/cf_01_data_' + timestamp
-content1 = np.loadtxt(file_name1)
+##################################################
+# MAIN
+##################################################
+
+if plot_newest:
+    folder_path = '/home/parallels/JMA_ws/src/test_data/'
+    # List all text files in the folder, ensuring they're regular files (not directories)
+    txt_files = [f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))]
+
+    # Sort the files by modification time (newest first) and get newest
+    txt_files.sort(key=lambda f: os.path.getmtime(os.path.join(folder_path, f)), reverse=True)
+    newest_file = txt_files[0]
+
+    # Read the content of the newest file
+    content1 = np.loadtxt(os.path.join(folder_path, newest_file))
+    print(f"Reading file: {newest_file}")
+else:
+    file_name1 = '/home/parallels/JMA_ws/src/test_data/cf_01_data_' + timestamp
+    content1 = np.loadtxt(file_name1)
 
 if num_drones > 1:
     file_name2 = '/home/parallels/JMA_ws/src/test_data/cf_01_data_' + timestamp
@@ -63,6 +88,7 @@ y_err_int1 = content1[:,32]
 z_err1 = content1[:,33]
 z_err_dot1 = content1[:,34]
 z_err_int1 = content1[:,35]
+yaw_desired = content1[:,36]
 
 if num_drones > 1:
     time2 = (content2[:,0] - content2[0,0]) / 1000.0
@@ -103,57 +129,71 @@ if num_drones > 1:
     z_err_dot2 = content2[:,35]
     z_err_int2 = content2[:,36]
 
-plt.figure(1)
+#plot settings
+mkr_size = 0.5
+
+plt.figure()
 plt.plot(x1,y1,'-',label='Actual 10',markersize=1)
 plt.plot(x_des1,y_des1,'o-',label='Desired 10',markersize=1)
 # plt.plot(x2,y2,'-',label='Actual 11',markersize=1)
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')
 plt.title('x and y')
+plt.ylim(-2.0, 2.0)
+plt.xlim(-2.0, 2.0)
 plt.gca().set_aspect('equal')
 plt.legend()
 
-plt.figure(15)
-plt.plot(time1,yaw_mocap1,'-',label='Actual yaw1',markersize=1)
-plt.xlabel('x [m]')
+plt.figure()
+plt.plot(time1,voltage1,'b-')
+plt.xlabel('Time [sec]')
+plt.ylabel('Voltage [V]')
+plt.title('CF Battery Voltage')
+plt.legend()
+
+plt.figure()
+plt.plot(time1,yaw_mocap1, 'o',label='Actual yaw1',markersize=mkr_size)
+# plt.hlines(90.0, xmin=time1[0], xmax=time1[-1], color='orange', label='Desired yaw')
+plt.plot(time1, yaw_desired, '-',label='Desired yaw1')
+plt.xlabel('Time [sec]')
 plt.ylabel('Yaw [deg]')
 # plt.title('x and y')
 plt.legend()
 plt.title('Yaw Data')
 
-plt.figure(2)
-plt.plot(time1,z1,'-',label='Actual',markersize=1)
-plt.plot(time1,z_des1,'--',label='Desired',markersize=1)
+plt.figure()
+plt.plot(time1,z1,'o',label='Actual',markersize=mkr_size)
+plt.plot(time1,z_des1,'-',label='Desired')
 plt.xlabel('Time [s]')
 plt.ylabel('z [m]')
 plt.title('Fly 10')
 plt.legend()
 
-plt.figure(3, figsize=(10, 12))
+plt.figure(figsize=(10, 12))
 plt.subplot(211)
-plt.plot(time1,y1,'-',label='Actual')
-plt.plot(time1,y_des1,'--',label='Desired')
+plt.plot(time1,y1,'o',label='Actual',markersize=mkr_size)
+plt.plot(time1,y_des1,'-',label='Desired')
 plt.xlabel('Time [s]')
 plt.ylabel('y [m]')
 plt.legend()
 plt.subplot(212)
-plt.plot(time1,pitch_mocap1,'-',label='Actual')
-plt.plot(time1,pitch_des1,'--',label='Desired')
+plt.plot(time1,pitch_mocap1,'o',label='Actual',markersize=mkr_size)
+plt.plot(time1,pitch_des1,'-',label='Desired')
 plt.xlabel('Time [s]')
 plt.ylabel('Pitch [deg]')
 plt.legend()
 plt.suptitle('Y-Position Data')
 
-plt.figure(4, figsize=(10, 12))
+plt.figure(figsize=(10, 12))
 plt.subplot(211)
-plt.plot(time1,x1,'-',label='Actual')
-plt.plot(time1,x_des1,'--',label='Desired')
+plt.plot(time1,x1,'o',label='Actual',markersize=mkr_size)
+plt.plot(time1,x_des1,'-',label='Desired')
 plt.xlabel('Time [s]')
 plt.ylabel('x [m]')
 plt.legend()
 plt.subplot(212)
-plt.plot(time1,roll_mocap1,'-',label='Actual')
-plt.plot(time1,roll_des1,'--',label='Desired')
+plt.plot(time1,roll_mocap1,'o',label='Actual',markersize=mkr_size)
+plt.plot(time1,roll_des1,'-',label='Desired')
 plt.xlabel('Time [s]')
 plt.ylabel('Roll [deg]')
 plt.legend()
