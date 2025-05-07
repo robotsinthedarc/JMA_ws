@@ -5,7 +5,7 @@ import math
 
 plt.close('all')
 
-timestamp = '2025_05_05_16_27'
+timestamp = '2025_05_06_16_46'
 num_drones = 1
 plot_error = True
 plot_angles = False
@@ -16,6 +16,15 @@ content1 = np.loadtxt(file_name1)
 if num_drones > 1:
     file_name2 = '/home/parallels/JMA_ws/src/test_data/cf_01_data_' + timestamp
     content2 = np.loadtxt(file_name2)
+
+# ([self.timestamp, self.acc_x, self.acc_y, self.acc_z, self.gyro_x, self.gyro_y, self.gyro_z,
+#                                      self.x, self.y, self.z, self.x_desired, self.y_desired, self.z_desired,
+#                                      self.roll_imu, self.pitch_imu, self.yaw_imu, self.roll_mocap, self.pitch_mocap, self.yaw_mocap,
+#                                      self.roll_desired, self.pitch_desired,
+#                                      self.m1, self.m2, self.m3, self.m4, self.voltage, self.current,
+#                                      self.x_err, self.x_err_dot, self.x_err_int,
+#                                      self.y_err, self.y_err_dot, self.y_err_int,
+#                                      self.z_err, self.z_err_dot, self.z_err_int])
 
 time1 = (content1[:,0] - content1[0,0]) / 1000.0 
 acc_x1 = content1[:,1]
@@ -38,22 +47,22 @@ pitch_mocap1 = content1[:,17]
 yaw_mocap1 = content1[:,18]
 roll_des1 = content1[:,19]
 pitch_des1 = content1[:,20]
-yaw_rate_des1 = content1[:,21]
-m11 = content1[:,22]
-m21 = content1[:,23]
-m31 = content1[:,24]
-m41 = content1[:,25]
-voltage1 = content1[:,26]
-current1 = content1[:,27]
-x_err1 = content1[:,28]
-x_err_dot1 = content1[:,29]
-x_err_int1 = content1[:,30]
-y_err1 = content1[:,31]
-y_err_dot1 = content1[:,32]
-y_err_int1 = content1[:,33]
-z_err1 = content1[:,34]
-# z_err_dot1 = content1[:,35]
-# z_err_int1 = content1[:,36]
+# yaw_rate_des1 = content1[:,21]
+m11 = content1[:,21]
+m21 = content1[:,22]
+m31 = content1[:,23]
+m41 = content1[:,24]
+voltage1 = content1[:,25]
+current1 = content1[:,26]
+x_err1 = content1[:,27]
+x_err_dot1 = content1[:,28]
+x_err_int1 = content1[:,29]
+y_err1 = content1[:,30]
+y_err_dot1 = content1[:,31]
+y_err_int1 = content1[:,32]
+z_err1 = content1[:,33]
+z_err_dot1 = content1[:,34]
+z_err_int1 = content1[:,35]
 
 if num_drones > 1:
     time2 = (content2[:,0] - content2[0,0]) / 1000.0
@@ -103,6 +112,14 @@ plt.ylabel('y [m]')
 plt.title('x and y')
 plt.gca().set_aspect('equal')
 plt.legend()
+
+plt.figure(15)
+plt.plot(time1,yaw_mocap1,'-',label='Actual yaw1',markersize=1)
+plt.xlabel('x [m]')
+plt.ylabel('Yaw [deg]')
+# plt.title('x and y')
+plt.legend()
+plt.title('Yaw Data')
 
 plt.figure(2)
 plt.plot(time1,z1,'-',label='Actual',markersize=1)

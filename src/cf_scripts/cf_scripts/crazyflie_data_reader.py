@@ -114,7 +114,7 @@ class DataPrintNode(Node):
 
         if self.landing and not self.printed:
             self.print_variables()
-            self.get_logger().info('cf ' + self.formatted_id + ' variables printed')
+            self.get_logger().info('cf ' + self.formatted_id + ' variables printed to ' + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M'))
             self.printed = True
 
     def print_variables(self):

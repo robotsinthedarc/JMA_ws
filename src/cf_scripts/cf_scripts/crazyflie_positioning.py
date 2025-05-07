@@ -14,11 +14,14 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from custom_msgs.msg import CrazyflieDesired, CrazyflieLanding
 
+###########################################
+# Node Class
+###########################################
 class PositionControlNode(Node):
     def __init__(self):
         super().__init__("crazyflie_positioning")
 
-        # declare ID as a parameter, set default to 10
+        # declare ID as a parameter, set default to 1
         self.declare_parameter("id",1)
         # get the parameter value from the launch script, or use the default
         self.id = self.get_parameter("id").value
@@ -34,9 +37,11 @@ class PositionControlNode(Node):
         # set initial landing and take of flags and values
         self.first_position = True
         self.first_landing_command = True
-        self.take_off = False #True
+        self.take_off = True
         self.landing = False
-        self.z_take_off = -0.1
+        self.z_take_off = 0.0
+
+        self.init_flag = True
 
         # create subscribers and publishers for the crazyflie
         # this one subscribes to MoCap data
@@ -45,15 +50,12 @@ class PositionControlNode(Node):
         self.desired_position_pub = self.create_publisher(CrazyflieDesired,pub_topic,10)
         # this subscribes to the landing topic to determine if landing is necessary
         self.landing_sub = self.create_subscription(CrazyflieLanding,'land',self.landing_callback,10)
-        time.sleep(2.0)
+        
+        # self.rate = self.create_rate(60) # 60 Hz
 
         # get the initialization time
         self.init_time = time.time()
         self.t = time.time() - self.init_time
-
-        # the period of a revolution if the drone is flying in a circle
-        self.omega = 1.0
-
         
 
     def position_callback(self,msg):
@@ -61,9 +63,10 @@ class PositionControlNode(Node):
             self.x0 = msg.pose.position.x
             self.y0 = msg.pose.position.y
             self.z0 = msg.pose.position.z
+            self.z_take_off = self.z0
             self.first_position = False
-            self.create_timer(0.01,self.desired_position_publisher)
-        if self.first_landing_command and self.landing:
+            self.create_timer(0.01,self.desired_position_publisher) # 100 Hz
+        elif self.first_landing_command and self.landing:
             self.get_logger().info('Landing...')
             self.x_land = msg.pose.position.x
             self.y_land = msg.pose.position.y
@@ -76,62 +79,78 @@ class PositionControlNode(Node):
         # uncomment sections below for different behaviors
         self.t = time.time() - self.init_time
         
-        # # circle
-        # msg.x_des = self.x0 + 0.5 * math.cos(self.omega * self.t)
-        # msg.y_des = self.y0 + 0.5 * math.sin(self.omega * self.t)
-        # msg.z_des = 0.5
-
-        # #step
-        # if self.t < 5.0:
-        #     msg.x_des = self.x0
-        #     msg.y_des = self.y0
-        #     msg.z_des = 0.5
-        # elif self.t >= 5.0 and self.t < 10.0:
-        #     msg.x_des = self.x0 + 0.1
-        #     msg.y_des = self.y0
-        #     msg.z_des = 0.5
-        # elif self.t >= 10.0 and self.t < 15.0:
-        #     msg.x_des = self.x0 - 0.1
-        #     msg.y_des = self.y0
-        #     msg.z_des = 0.5
-        # elif self.t >= 15.0 and self.t < 20.0:
-        #     msg.x_des = self.x0
-        #     msg.y_des = self.y0
-        #     msg.z_des = 0.5
-        # elif self.t >= 20.0 and self.t < 25.0:
-        #     msg.x_des = self.x0
-        #     msg.y_des = self.y0 + 0.1
-        #     msg.z_des = 0.5
-        # elif self.t >= 25.0 and self.t < 30.0:
-        #     msg.x_des = self.x0
-        #     msg.y_des = self.y0 - 0.1
-        #     msg.z_des = 0.5
-        # elif self.t >= 35.0 and self.t < 40.0:
-        #     msg.x_des = self.x0
-        #     msg.y_des = self.y0
-        #     msg.z_des = 0.5    
-        # else:
-        #     msg.x_des = self.x0
-        #     msg.y_des = self.y0
-        #     msg.z_des = 0.5
-        
-        # Hover
-        msg.x_des = self.x0
-        msg.y_des = self.y0
-        msg.z_des = 0.4
-
-        # set up take off procedure
-        # the drone will slowly rise to a desired height
-        # once at the desired height, the desired trajectory will begin
-        if self.take_off and self.z_take_off < 0.4:
-            self.z_take_off += 0.001
-            msg.z_des = self.z_take_off
+        if self.init_flag:
             msg.x_des = self.x0
             msg.y_des = self.y0
-            if self.z_take_off > 0.4:
-                self.take_off = False
+            msg.z_des = self.z0
+
+            if self.t > 5.0:
+                self.init_flag = False
                 self.init_time = time.time()
-                self.t = time.time() - self.init_time
+        else:
+
+            # set up take off procedure
+            # the drone will slowly rise to a desired height
+            # once at the desired height, the desired trajectory will begin
+
+            if self.take_off and self.z_take_off < 0.4:
+                alpha = 0.6
+                self.z_take_off = self.sigmoid_traj(self.t, self.z0, 0.4, 1.0, alpha)
+                msg.z_des = self.z_take_off
+                msg.x_des = self.x0
+                msg.y_des = self.y0
+                if self.z_take_off > 0.99*0.4:
+                    self.take_off = False
+                    self.init_time = time.time()
+                    self.t = time.time() - self.init_time
+            else:
+                ###############################################
+                # Select Trajectory
+                ###############################################
+
+                # # circle
+                # msg.x_des = self.x0 + 0.5 * math.cos(self.omega * self.t)
+                # msg.y_des = self.y0 + 0.5 * math.sin(self.omega * self.t)
+                # msg.z_des = 0.5
+
+                # #step
+                # if self.t < 5.0:
+                #     msg.x_des = self.x0
+                #     msg.y_des = self.y0
+                #     msg.z_des = 0.5
+                # elif self.t >= 5.0 and self.t < 10.0:
+                #     msg.x_des = self.x0 + 0.1
+                #     msg.y_des = self.y0
+                #     msg.z_des = 0.5
+                # elif self.t >= 10.0 and self.t < 15.0:
+                #     msg.x_des = self.x0 - 0.1
+                #     msg.y_des = self.y0
+                #     msg.z_des = 0.5
+                # elif self.t >= 15.0 and self.t < 20.0:
+                #     msg.x_des = self.x0
+                #     msg.y_des = self.y0
+                #     msg.z_des = 0.5
+                # elif self.t >= 20.0 and self.t < 25.0:
+                #     msg.x_des = self.x0
+                #     msg.y_des = self.y0 + 0.1
+                #     msg.z_des = 0.5
+                # elif self.t >= 25.0 and self.t < 30.0:
+                #     msg.x_des = self.x0
+                #     msg.y_des = self.y0 - 0.1
+                #     msg.z_des = 0.5
+                # elif self.t >= 35.0 and self.t < 40.0:
+                #     msg.x_des = self.x0
+                #     msg.y_des = self.y0
+                #     msg.z_des = 0.5    
+                # else:
+                #     msg.x_des = self.x0
+                #     msg.y_des = self.y0
+                #     msg.z_des = 0.5
+                
+                # Hover
+                msg.x_des = self.x0
+                msg.y_des = self.y0
+                msg.z_des = 0.4
 
         # set up landing producre
         # the drone will slowly descend to a 5 cm
@@ -144,10 +163,22 @@ class PositionControlNode(Node):
             msg.y_des = self.y_land
             msg.z_des = self.z_land
 
+            
+
         self.desired_position_pub.publish(msg)
+        # self.rate.sleep() # limit to at fastest 60 Hz
 
     def landing_callback(self, msg):
         self.landing = msg.land
+
+    def sigmoid_traj(self, t, start_height, max_height, max_slope, alpha):
+        # alpha specifies the ratio of the max height to compare to for the midpoint calculation
+        # larger alpha will take longer but limit to max speed better
+        max_height = max_height - start_height
+
+        # t0 = -(1/(2*max_slope)) * math.log((max_height - alpha*max_height) / (alpha*max_height))
+        t0 = 5
+        return start_height + (max_height / (1 + math.exp(-max_slope * (t - t0))))
 
 def main(args=None):
     """Main function. Will run automatically on starting the node."""

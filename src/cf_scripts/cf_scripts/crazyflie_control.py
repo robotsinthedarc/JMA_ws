@@ -74,19 +74,19 @@ class FlyControlNode(Node):
         # gains for the z dierection appear fine for both drones
         # tuning needs continued in x and y directions
         if self.id == 1:
-            # self.kp_z = 115.0
-            # self.kd_z = 40.0
-            # self.ki_z = 25.0
-            # self.kp_xy = 36.0
-            # self.kd_xy = 50.0
-            # self.ki_xy = 7.0
+            self.kp_z = 115.0
+            self.kd_z = 40.0
+            self.ki_z = 25.0
+            self.kp_xy = 36.0
+            self.kd_xy = 50.0
+            self.ki_xy = 7.0
 
-            self.kp_z = 2400.0
-            self.kd_z = 0.0
-            self.ki_z = 0.0
-            self.kp_xy = 80.0
-            self.kd_xy = 0.0
-            self.ki_xy = 0.0
+            # self.kp_z = 2400.0
+            # self.kd_z = 0.0
+            # self.ki_z = 0.0
+            # self.kp_xy = 4800.0
+            # self.kd_xy = 0.0
+            # self.ki_xy = 0.0
 
         if self.id == 2:
             self.kp_z = 120.0
@@ -189,7 +189,7 @@ class FlyControlNode(Node):
         # map force value to thrust value
         # thrust ranges from 20000 to 60000
         force = self.kp_z * self.z_err + self.kd_z * self.z_err_dot + self.ki_z * self.z_err_int
-        self.thrust = math.floor(25000 + force)
+        self.thrust = math.floor(25000 + 500*force)
         if self.thrust > 60000: # higher than max, cap the thrust
             self.thrust = 60000
         elif self.thrust < 20000: # lower than min, set to min
@@ -200,8 +200,10 @@ class FlyControlNode(Node):
         pitch_des = self.kp_xy * self.x_err + self.kd_xy * self.x_err_dot + self.ki_xy * self.x_err_int
 
         # transform desired roll and pitch to body coordinates
+        # self.roll_des = roll_des * math.cos(-self.yaw * math.pi / 180.0) - pitch_des * math.sin(-self.yaw * math.pi / 180.0)
+        # self.pitch_des = roll_des * math.sin(-self.yaw * math.pi / 180.0) + pitch_des * math.cos(-self.yaw * math.pi / 180.0)
         self.roll_des = roll_des * math.cos(-self.yaw * math.pi / 180.0) - pitch_des * math.sin(-self.yaw * math.pi / 180.0)
-        self.pitch_des = roll_des * math.sin(-self.yaw * math.pi / 180.0) + pitch_des * math.cos(-self.yaw * math.pi / 180.0)
+        self.pitch_des = (roll_des * math.sin(-self.yaw * math.pi / 180.0) + pitch_des * math.cos(-self.yaw * math.pi / 180.0))
         if self.roll_des > 45.0:
             self.roll_des = 45.0
         elif self.roll_des < -45.0:

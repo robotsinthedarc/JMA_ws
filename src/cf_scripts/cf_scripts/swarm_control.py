@@ -206,8 +206,8 @@ class SwarmControlNode(Node):
     def get_commands(self,msg):
         # Reads the motor commands from other crazyflie 
         # command publishers into the command dictionary keyed on URI
-        vec = {msg.uri: [msg.desired_roll, msg.desired_pitch, msg.desired_yaw_rate, msg.thrust]}
-        # vec = {msg.uri: [0.0, 0.0, 0.0, 0]}
+        # vec = {msg.uri: [msg.desired_roll, msg.desired_pitch, msg.desired_yaw_rate, msg.thrust]}
+        vec = {msg.uri: [0.0, 0.0, 0.0, 0]}
         if self.landing and msg.z_desired < 0.08:
             vec = {msg.uri: [0.0, 0.0, 0.0, 0]}
         self.com_dict.update(vec)
