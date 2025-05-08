@@ -16,6 +16,11 @@ from custom_msgs.msg import CrazyflieDesired, CrazyflieLanding
 from std_msgs.msg import Bool
 
 ###########################################
+# Global Parameters
+###########################################
+loop_rate = 100.0 # Hz
+
+###########################################
 # Node Class
 ###########################################
 class PositionControlNode(Node):
@@ -44,6 +49,9 @@ class PositionControlNode(Node):
         self.z_take_off = 0.0
 
         self.init_flag = True
+
+        # trajectory loading parameters
+        self.k = 0 # iteration variable for trajectory indexing
 
         # create subscribers and publishers for the crazyflie
         # this one subscribes to MoCap data
@@ -90,7 +98,7 @@ class PositionControlNode(Node):
             self.yaw0 = self.yaw
 
             self.first_position = False
-            self.create_timer(0.01,self.desired_position_publisher) # 100 Hz
+            self.create_timer((1.0/loop_rate),self.desired_position_publisher) # 20 Hz
         elif self.first_landing_command and self.landing:
             self.get_logger().info('Landing...')
             self.x_land = msg.pose.position.x
@@ -103,6 +111,8 @@ class PositionControlNode(Node):
         msg = CrazyflieDesired()
         # uncomment sections below for different behaviors
         self.t = time.time() - self.init_time
+
+        hover_height = 0.9
         
         if self.init_flag:
             msg.x_des = self.x0
@@ -119,9 +129,9 @@ class PositionControlNode(Node):
             # the drone will slowly rise to a desired height
             # once at the desired height, the desired trajectory will begin
 
-            if self.take_off and self.z_take_off < 0.4:
-                alpha = 0.6
-                self.z_take_off = self.sigmoid_traj(self.t, self.z0, 1.001*0.4, 1.0, alpha)
+            if self.take_off and self.z_take_off < hover_height:
+                # t0 = -(1/(2*max_slope)) * math.log((max_height - alpha*max_height) / (alpha*max_height))
+                self.z_take_off = self.sigmoid_traj(self.t, self.z0, 1.001*hover_height)
                 msg.z_des = self.z_take_off
                 msg.x_des = self.x0
                 msg.y_des = self.y0
@@ -131,7 +141,7 @@ class PositionControlNode(Node):
                 else:
                     msg.yaw_des = 90.0
 
-                if self.z_take_off > 0.4:
+                if self.z_take_off > hover_height:
                     self.take_off = False
                     self.get_logger().info("cf" + self.formatted_id + " hover position reached")
                     self.init_time = time.time()
@@ -184,7 +194,7 @@ class PositionControlNode(Node):
                 msg.x_des = self.x0
                 msg.y_des = self.y0
                 # msg.z_des = 0.5
-                msg.z_des = self.z_take_off
+                msg.z_des = self.z_take_off + 0.1
                 msg.yaw_des = 90.0
             else:
                 msg.z_des = self.z_take_off
@@ -213,14 +223,16 @@ class PositionControlNode(Node):
     def start_test_callback(self, msg):
         self.start_test = msg.data
 
-    def sigmoid_traj(self, t, start_height, max_height, max_slope, alpha):
+    def sigmoid_traj(self, t, start_height, max_height):
         # alpha specifies the ratio of the max height to compare to for the midpoint calculation
         # larger alpha will take longer but limit to max speed better
         max_height = max_height - start_height
+        set_vel = 0.07 # m/s
 
         # t0 = -(1/(2*max_slope)) * math.log((max_height - alpha*max_height) / (alpha*max_height))
-        t0 = 5
-        return start_height + (max_height / (1 + math.exp(-max_slope * (t - t0))))
+        t0 = max_height/ (set_vel*2)
+        slope = (4*set_vel*3) / max_height
+        return start_height + (max_height / (1 + math.exp(-slope * (t - t0))))
 
 def main(args=None):
     """Main function. Will run automatically on starting the node."""

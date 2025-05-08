@@ -15,6 +15,14 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from custom_msgs.msg import CrazyflieCommands, CrazyflieDesired
 
+###########################################
+# Global Parameters
+###########################################
+loop_rate = 100.0 # Hz
+
+###########################################
+# Node Class
+###########################################
 class FlyControlNode(Node):
     def __init__(self):
         super().__init__("crazyflie_control")
@@ -40,7 +48,7 @@ class FlyControlNode(Node):
         self.desired_position_sub = self.create_subscription(CrazyflieDesired,sub_topic2,self.desired_position_callback,10)
         # this publisher publishes commands, which ar sent to the swarm_control.py node
         self.motor_command_publisher = self.create_publisher(CrazyflieCommands,pub_topic,10)
-        self.create_timer(0.01,self.publish_commands)
+        self.create_timer((1.0/loop_rate),self.publish_commands)
 
         # set an initial flag to get the first position of the drone
         self.first_position = True
@@ -88,8 +96,8 @@ class FlyControlNode(Node):
         # self.kd_z = 40.0
         # self.ki_z = 25.0
         self.kp_z = 115.0 # Jacob's gains
-        self.kd_z = 42.0
-        self.ki_z = 25.0
+        self.kd_z = 38.0
+        self.ki_z = 23.0
 
         # tuned for x-step
         # self.kp_xy = 60.0

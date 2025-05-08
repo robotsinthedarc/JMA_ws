@@ -17,6 +17,16 @@ from cflib.crazyflie.log import LogConfig
 
 from custom_msgs.msg import CrazyflieCommands, CrazyflieData, CrazyflieLanding
 
+###########################################
+# Global Parameters
+###########################################
+enable_flight = True
+
+loop_rate = 100.0 # Hz
+
+###########################################
+# Node Class
+###########################################
 class SwarmControlNode(Node):
     def __init__(self):
         super().__init__("swarm_control")
@@ -110,18 +120,18 @@ class SwarmControlNode(Node):
         if self.ids > 0:
             self.cf01_publisher = self.create_publisher(
                 CrazyflieData, '/cf01/data',10)
-            self.create_timer(0.01,self.cf01_publish_callback)
+            self.create_timer((1.0/loop_rate),self.cf01_publish_callback)
         if self.ids > 1:
             self.cf02_publisher = self.create_publisher(
                 CrazyflieData, '/cf02/data',10)
-            self.create_timer(0.01,self.cf02_publish_callback)
+            self.create_timer((1.0/loop_rate),self.cf02_publish_callback)
 
         # arm all drones in the swarm
         self.swarm.parallel_safe(self.arming_function)
         # unlock all motors
         self.swarm.parallel_safe(self.initialize)
         # begin sending motor commands
-        self.create_timer(0.01,self.motor_controller)
+        self.create_timer((1.0/loop_rate),self.motor_controller)
 
     def init_configs(self,scf):
         # set up logging to read IMU data
@@ -206,8 +216,11 @@ class SwarmControlNode(Node):
     def get_commands(self,msg):
         # Reads the motor commands from other crazyflie 
         # command publishers into the command dictionary keyed on URI
-        vec = {msg.uri: [msg.desired_roll, msg.desired_pitch, msg.desired_yaw_rate, msg.thrust]}
-        # vec = {msg.uri: [0.0, 0.0, 0.0, 0]}
+        if enable_flight:
+            vec = {msg.uri: [msg.desired_roll, msg.desired_pitch, msg.desired_yaw_rate, msg.thrust]}
+        else:
+            vec = {msg.uri: [0.0, 0.0, 0.0, 0]}
+
         if self.landing and msg.z_desired < 0.075:
             vec = {msg.uri: [0.0, 0.0, 0.0, 0]}
         self.com_dict.update(vec)
