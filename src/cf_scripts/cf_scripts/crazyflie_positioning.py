@@ -22,7 +22,8 @@ from std_msgs.msg import Bool
 loop_rate = 100.0 # Hz
 
 # selet trajectory to follow
-traj_name = 'hover_80cm_30s'
+# traj_name = 'hover_80cm_30s'    # starts at x=0.25, y=-0.25
+traj_name = 'hover_1m_300s'     # starts at x = 0.0, y=0.0
 
 ###########################################
 # Functions
@@ -79,8 +80,10 @@ class PositionControlNode(Node):
         self.landing = False
         self.start_test = False
         self.z_take_off = 0.0
+        self.time_shift = 0.0
 
         self.init_flag = True
+        self.xy_start_flag = True
 
         # trajectory loading parameters
         self.k = 0 # iteration variable for trajectory indexing
@@ -169,16 +172,38 @@ class PositionControlNode(Node):
 
             if self.take_off and self.z_take_off < hover_height:
                 self.z_take_off = self.sigmoid_traj(self.t, self.z0, 1.001*hover_height)
+                
                 msg.z_des = self.z_take_off
-                msg.x_des = self.sigmoid_traj(self.t, self.x0, self.traj_data[0,1])
-                msg.y_des = self.sigmoid_traj(self.t, self.y0, self.traj_data[0,2])
 
                 if self.z_take_off < 0.25:
+                    msg.x_des = self.x0
+                    msg.y_des = self.y0
                     msg.yaw_des = self.yaw0
                 else:
+                    if self.xy_start_flag:
+                        self.time_shift = time.time() - self.init_time
+                        self.xy_start_flag = False
+
+                    if self.traj_data[0,1] == 0.0:
+                        if self.x0 > 0.0:
+                            msg.x_des = self.sigmoid_traj(self.t - self.time_shift, self.x0, 0.001)
+                        else:
+                            msg.x_des = self.sigmoid_traj(self.t - self.time_shift, self.x0, -0.001)
+                    else:
+                        msg.x_des = self.sigmoid_traj(self.t - self.time_shift, self.x0, 1.001*self.traj_data[0,1])
+
+                    if self.traj_data[0,2] == 0.0:
+                        if self.y0 > 0.0:
+                            msg.y_des = self.sigmoid_traj(self.t - self.time_shift, self.y0, 0.001)
+                        else:
+                            msg.y_des = self.sigmoid_traj(self.t - self.time_shift, self.y0, -0.001)
+                    else:
+                        msg.y_des = self.sigmoid_traj(self.t - self.time_shift, self.y0, 1.001*self.traj_data[0,2])
+
+                    
                     msg.yaw_des = self.traj_data[0,4] # yaw from trajectory file
 
-                if self.z_take_off > hover_height:
+                if self.z_take_off > hover_height and abs(msg.x_des) > abs(self.traj_data[0,1]) and abs(msg.y_des) > abs(self.traj_data[0,2]):
                     self.take_off = False
                     self.get_logger().info("cf" + self.formatted_id + " hover position reached")
                     self.init_time = time.time()
@@ -189,9 +214,8 @@ class PositionControlNode(Node):
                 ###############################################
 
                 # Hover
-                msg.x_des = self.x0
-                msg.y_des = self.y0
-                # msg.z_des = 0.5
+                msg.x_des = self.traj_data[self.k,1] # x from trajectory file
+                msg.y_des = self.traj_data[self.k,2] # y from trajectory file
                 msg.z_des = self.traj_data[self.k,3] # z from trajectory file
                 msg.yaw_des = self.traj_data[0,4] # yaw from trajectory file
 
@@ -203,14 +227,14 @@ class PositionControlNode(Node):
             else:
 
                 if self.k == 0:
+                    msg.x_des = self.traj_data[0,1] # x from trajectory file
+                    msg.y_des = self.traj_data[0,2] # y from trajectory file
                     msg.z_des = self.z_take_off
-                    msg.x_des = self.x0
-                    msg.y_des = self.y0
                     msg.yaw_des = self.traj_data[0,4] # yaw from trajectory file
                 else:
+                    msg.x_des = self.traj_data[self.k,1] # hold last x position
+                    msg.y_des = self.traj_data[self.k,2] # hold last y position
                     msg.z_des = self.traj_data[self.k,3] # hold last z position
-                    msg.x_des = self.x0
-                    msg.y_des = self.y0
                     msg.yaw_des = self.traj_data[0,4] # yaw from trajectory file
 
         # set up landing producre
@@ -229,6 +253,10 @@ class PositionControlNode(Node):
         self.desired_position_pub.publish(msg)
         self.test_comlete_pub.publish(self.test_complete_msg)
 
+        if self.start_test and self.k % 1000 == 0:
+            self.get_logger().info("Time: " + str(self.k/100) + "s ||| cf" + self.formatted_id + " moving to x: " + str(msg.x_des) + " y: " + str(msg.y_des) + " z: " + str(msg.z_des))
+
+
     def landing_callback(self, msg):
         self.landing = msg.land
 
@@ -239,12 +267,18 @@ class PositionControlNode(Node):
         # alpha specifies the ratio of the max height to compare to for the midpoint calculation
         # larger alpha will take longer but limit to max speed better
         max_height = max_height - start_height
+        if max_height < 0.0:
+            sign_val = -1.0
+            max_height = abs(max_height)
+        else:
+            sign_val = 1.0
+
         set_vel = 0.07 # m/s
 
         # t0 = -(1/(2*max_slope)) * math.log((max_height - alpha*max_height) / (alpha*max_height))
         t0 = max_height/ (set_vel*2)
         slope = (4*set_vel*3) / max_height
-        return start_height + (max_height / (1 + math.exp(-slope * (t - t0))))
+        return  start_height + (sign_val *(max_height / (1 + math.exp(-slope * (t - t0)))))
 
 def main(args=None):
     """Main function. Will run automatically on starting the node."""

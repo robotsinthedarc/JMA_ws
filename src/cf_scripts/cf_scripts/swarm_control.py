@@ -20,7 +20,7 @@ from custom_msgs.msg import CrazyflieCommands, CrazyflieData, CrazyflieLanding
 ###########################################
 # Global Parameters
 ###########################################
-enable_flight = False
+enable_flight = True
 
 loop_rate = 100.0 # Hz
 

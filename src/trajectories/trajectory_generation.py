@@ -62,7 +62,7 @@ def save_trajectory_to_file(time, x_pos, y_pos, z_pos, yaw):
 # total_time = 30  # Total time for trajectory
 
 # Create the hover trajectory
-time, x_pos, y_pos, z_pos, yaw = create_hover_trajectory(x=0.25, y=-0.25, z=0.8, frequency=100, total_time=30)
+time, x_pos, y_pos, z_pos, yaw = create_hover_trajectory(x=0.0, y=0.0, z=1.0, frequency=100, total_time=300)
 
 # Save the trajectory to a file
 save_trajectory_to_file(time, x_pos, y_pos, z_pos, yaw)

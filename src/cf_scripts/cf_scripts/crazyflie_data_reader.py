@@ -78,7 +78,7 @@ class DataPrintNode(Node):
         self.z_err_int = []
 
     def data_callback(self,msg):
-        if not self.first_message and not test_complete:
+        if not self.first_message and not self.test_complete:
         # if not self.first_message and self.start_test and not self.test_complete:
             self.timestamp.append(msg.timestamp)
             self.acc_x.append(msg.acc_x)
