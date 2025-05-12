@@ -12,12 +12,15 @@ import rclpy
 from rclpy.node import Node
 
 from custom_msgs.msg import CrazyflieData, CrazyflieLanding
+from std_msgs.msg import Bool
 
 class DataPrintNode(Node):
     def __init__(self):
         super().__init__("crazyflie_data_reader")
 
         self.landing = False
+        self.start_test = False
+        self.test_complete = False
         self.printed = False
         self.first_message = True
 
@@ -29,9 +32,12 @@ class DataPrintNode(Node):
         self.get_logger().info("cf " + self.formatted_id + " Data Reader launched")
 
         sub_topic = '/cf' + self.formatted_id + '/data'
+        test_complete_topic = '/cf' + self.formatted_id + '/test_complete'
 
         self.data_sub = self.create_subscription(CrazyflieData,sub_topic,self.data_callback,10)
         self.landing_sub = self.create_subscription(CrazyflieLanding,'land',self.landing_callback,10)
+        self.start_test_sub = self.create_subscription(Bool,'start_test',self.start_test_callback,10)
+        self.test_complete_sub = self.create_subscription(Bool, test_complete_topic, self.test_complete_callback,10)
 
         self.timestamp = []
         self.acc_x = []
@@ -72,7 +78,8 @@ class DataPrintNode(Node):
         self.z_err_int = []
 
     def data_callback(self,msg):
-        if not self.first_message:
+        if not self.first_message and not test_complete:
+        # if not self.first_message and self.start_test and not self.test_complete:
             self.timestamp.append(msg.timestamp)
             self.acc_x.append(msg.acc_x)
             self.acc_y.append(msg.acc_y)
@@ -114,7 +121,7 @@ class DataPrintNode(Node):
         if msg.timestamp > 0 and msg.x_desired != 0:
             self.first_message = False
 
-        if self.landing and not self.printed:
+        if (self.landing or self.test_complete) and not self.printed:
             self.print_variables()
             self.get_logger().info('cf ' + self.formatted_id + ' variables printed to ' + datetime.datetime.now().strftime('%Y_%m_%d_%H_%M'))
             self.printed = True
@@ -134,6 +141,12 @@ class DataPrintNode(Node):
 
     def landing_callback(self, msg):
         self.landing = msg.land
+
+    def start_test_callback(self, msg):
+        self.start_test = msg.data
+
+    def test_complete_callback(self, msg):
+        self.test_complete = msg.data
 
 def main(args=None):
     try:

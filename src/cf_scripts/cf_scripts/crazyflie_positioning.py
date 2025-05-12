@@ -7,6 +7,7 @@ to individual Crazyflies"""
 
 import math
 import time
+import numpy as np
 
 import rclpy
 from rclpy.node import Node
@@ -19,6 +20,36 @@ from std_msgs.msg import Bool
 # Global Parameters
 ###########################################
 loop_rate = 100.0 # Hz
+
+# selet trajectory to follow
+traj_name = 'hover_80cm_30s'
+
+###########################################
+# Functions
+###########################################
+def read_trajectory_from_file(traj_name):
+    """
+    Reads the trajectory data from a file and returns numpy arrays for time, x, y, z, and yaw.
+    
+    Arguments:
+    file_name (str): The name of the file to read the trajectory from.
+    
+    Returns:
+    time, x_pos, y_pos, z_pos, yaw (numpy arrays): Arrays of time, x, y, z, yaw data.
+    """
+    # Load the trajectory data from the file, skip the header row
+    traj_location = '/home/parallels/JMA_ws/src/trajectories/saved_trajectories/' + traj_name
+    data = np.loadtxt(traj_location, delimiter=' ', skiprows=1)
+    
+    # # Extract each column from the loaded data
+    # time = data[:, 0]
+    # x_pos = data[:, 1]
+    # y_pos = data[:, 2]
+    # z_pos = data[:, 3]
+    # yaw = data[:, 4]
+    
+    # return time, x_pos, y_pos, z_pos, yaw
+    return data
 
 ###########################################
 # Node Class
@@ -39,6 +70,7 @@ class PositionControlNode(Node):
         self.uri = 'radio://0/80/2M/E7E7E7E7' + self.formatted_id
         sub_topic = '/cf' + self.formatted_id + '/pose'
         pub_topic = '/cf' + self.formatted_id + '/desired'
+        test_complete_topic = '/cf' + self.formatted_id + '/test_complete'
 
         # set initial landing and take of flags and values
         self.first_position = True
@@ -52,6 +84,8 @@ class PositionControlNode(Node):
 
         # trajectory loading parameters
         self.k = 0 # iteration variable for trajectory indexing
+        global traj_name
+        self.traj_data = read_trajectory_from_file(traj_name)   # columns are (time, x, y, z, yaw)
 
         # create subscribers and publishers for the crazyflie
         # this one subscribes to MoCap data
@@ -61,6 +95,10 @@ class PositionControlNode(Node):
         # this subscribes to the landing topic to determine if landing is necessary
         self.landing_sub = self.create_subscription(CrazyflieLanding,'land',self.landing_callback,10)
         self.start_test_sub = self.create_subscription(Bool,'start_test',self.start_test_callback,10)
+
+        self.test_comlete_pub = self.create_publisher(Bool,test_complete_topic,10)
+        self.test_complete_msg = Bool()
+        self.test_complete_msg.data = False
         
 
         # get the initialization time
@@ -98,7 +136,7 @@ class PositionControlNode(Node):
             self.yaw0 = self.yaw
 
             self.first_position = False
-            self.create_timer((1.0/loop_rate),self.desired_position_publisher) # 20 Hz
+            self.create_timer((1.0/loop_rate),self.desired_position_publisher)
         elif self.first_landing_command and self.landing:
             self.get_logger().info('Landing...')
             self.x_land = msg.pose.position.x
@@ -112,7 +150,7 @@ class PositionControlNode(Node):
         # uncomment sections below for different behaviors
         self.t = time.time() - self.init_time
 
-        hover_height = 0.9
+        hover_height = self.traj_data[0,3]
         
         if self.init_flag:
             msg.x_des = self.x0
@@ -130,77 +168,50 @@ class PositionControlNode(Node):
             # once at the desired height, the desired trajectory will begin
 
             if self.take_off and self.z_take_off < hover_height:
-                # t0 = -(1/(2*max_slope)) * math.log((max_height - alpha*max_height) / (alpha*max_height))
                 self.z_take_off = self.sigmoid_traj(self.t, self.z0, 1.001*hover_height)
                 msg.z_des = self.z_take_off
-                msg.x_des = self.x0
-                msg.y_des = self.y0
+                msg.x_des = self.sigmoid_traj(self.t, self.x0, self.traj_data[0,1])
+                msg.y_des = self.sigmoid_traj(self.t, self.y0, self.traj_data[0,2])
 
                 if self.z_take_off < 0.25:
                     msg.yaw_des = self.yaw0
                 else:
-                    msg.yaw_des = 90.0
+                    msg.yaw_des = self.traj_data[0,4] # yaw from trajectory file
 
                 if self.z_take_off > hover_height:
                     self.take_off = False
                     self.get_logger().info("cf" + self.formatted_id + " hover position reached")
                     self.init_time = time.time()
                     self.t = time.time() - self.init_time
-            elif self.start_test:
+            elif self.start_test and not self.test_complete_msg.data:
                 ###############################################
-                # Select Trajectory
+                # Follow trajectory
                 ###############################################
 
-                # # circle
-                # msg.x_des = self.x0 + 0.5 * math.cos(self.omega * self.t)
-                # msg.y_des = self.y0 + 0.5 * math.sin(self.omega * self.t)
-                # msg.z_des = 0.5
-
-                # #step
-                # if self.t < 5.0:
-                #     msg.x_des = self.x0
-                #     msg.y_des = self.y0
-                #     msg.z_des = 0.5
-                # elif self.t >= 5.0 and self.t < 10.0:
-                #     msg.x_des = self.x0 + 0.1
-                #     msg.y_des = self.y0
-                #     msg.z_des = 0.5
-                # elif self.t >= 10.0 and self.t < 15.0:
-                #     msg.x_des = self.x0 - 0.1
-                #     msg.y_des = self.y0
-                #     msg.z_des = 0.5
-                # elif self.t >= 15.0 and self.t < 20.0:
-                #     msg.x_des = self.x0
-                #     msg.y_des = self.y0
-                #     msg.z_des = 0.5
-                # elif self.t >= 20.0 and self.t < 25.0:
-                #     msg.x_des = self.x0
-                #     msg.y_des = self.y0 + 0.1
-                #     msg.z_des = 0.5
-                # elif self.t >= 25.0 and self.t < 30.0:
-                #     msg.x_des = self.x0
-                #     msg.y_des = self.y0 - 0.1
-                #     msg.z_des = 0.5
-                # elif self.t >= 35.0 and self.t < 40.0:
-                #     msg.x_des = self.x0
-                #     msg.y_des = self.y0
-                #     msg.z_des = 0.5    
-                # else:
-                #     msg.x_des = self.x0
-                #     msg.y_des = self.y0
-                #     msg.z_des = 0.5
-                
                 # Hover
                 msg.x_des = self.x0
                 msg.y_des = self.y0
                 # msg.z_des = 0.5
-                msg.z_des = self.z_take_off + 0.1
-                msg.yaw_des = 90.0
+                msg.z_des = self.traj_data[self.k,3] # z from trajectory file
+                msg.yaw_des = self.traj_data[0,4] # yaw from trajectory file
+
+                if self.k < len(self.traj_data)-1:
+                    self.k += 1
+                else:
+                    self.test_complete_msg.data = True
+                    self.get_logger().info("cf" + self.formatted_id + ": test completed, holding position")
             else:
-                msg.z_des = self.z_take_off
-                msg.x_des = self.x0
-                msg.y_des = self.y0
-                msg.yaw_des = 90.0
+
+                if self.k == 0:
+                    msg.z_des = self.z_take_off
+                    msg.x_des = self.x0
+                    msg.y_des = self.y0
+                    msg.yaw_des = self.traj_data[0,4] # yaw from trajectory file
+                else:
+                    msg.z_des = self.traj_data[self.k,3] # hold last z position
+                    msg.x_des = self.x0
+                    msg.y_des = self.y0
+                    msg.yaw_des = self.traj_data[0,4] # yaw from trajectory file
 
         # set up landing producre
         # the drone will slowly descend to a 5 cm
@@ -216,6 +227,7 @@ class PositionControlNode(Node):
             
 
         self.desired_position_pub.publish(msg)
+        self.test_comlete_pub.publish(self.test_complete_msg)
 
     def landing_callback(self, msg):
         self.landing = msg.land
